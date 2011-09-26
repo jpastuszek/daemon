@@ -17,7 +17,7 @@ Jeweler::Tasks.new do |gem|
   gem.name = "daemon"
   gem.homepage = "http://github.com/jpastuszek/daemon"
   gem.license = "MIT"
-  gem.summary = "Deamonize your script with a single line of code"
+  gem.summary = "Daemonize your script with a single line of code"
   gem.description = "Make calling script to become a daemon with pid file locking support and stdout/stderr redirection"
   gem.email = "jpastuszek@gmail.com"
   gem.authors = ["Jakub Pastuszek"]

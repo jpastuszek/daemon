@@ -1,6 +1,28 @@
 = daemon
 
-Description goes here.
+This gem allows the calling script to become a daemon by locking a PID file with flock, redirecting stdout/stderr to given log file or /dev/null and forking the process while becoming session leader.
+
+== Usage
+
+Become a daemon:
+
+# Daemon.daemonize('myscript.pid')
+
+or with log file:
+
+# Daemon.daemonize('myscript.pid', 'out.log')
+
+Just lock the PID and stay in foreground:
+
+# Daemon.lock('myscript.pid')
+
+So full usage may look like this:
+
+# if stay_in_foreground?
+#   Daemon.lock('myscript.pid')
+# else
+#   Daemon.daemonize('myscript.pid', 'out.log')
+# end
 
 == Contributing to daemon
  

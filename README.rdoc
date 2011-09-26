@@ -6,23 +6,23 @@ This gem allows the calling script to become a daemon by locking a PID file with
 
 Become a daemon:
 
- $ Daemon.daemonize('myscript.pid')
+ Daemon.daemonize('myscript.pid')
 
 or with log file:
 
- $ Daemon.daemonize('myscript.pid', 'out.log')
+ Daemon.daemonize('myscript.pid', 'out.log')
 
 Just lock the PID and stay in foreground:
 
- $ Daemon.lock('myscript.pid')
+ Daemon.lock('myscript.pid')
 
 So full usage may look like this:
 
- $ if stay_in_foreground?
- $   Daemon.lock('myscript.pid')
- $ else
- $   Daemon.daemonize('myscript.pid', 'out.log')
- $ end
+ if stay_in_foreground?
+   Daemon.lock('myscript.pid')
+ else
+   Daemon.daemonize('myscript.pid', 'out.log')
+ end
 
 == Contributing to daemon
  

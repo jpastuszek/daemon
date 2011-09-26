@@ -17,8 +17,8 @@ Jeweler::Tasks.new do |gem|
   gem.name = "daemon"
   gem.homepage = "http://github.com/jpastuszek/daemon"
   gem.license = "MIT"
-  gem.summary = %Q{TODO: one-line summary of your gem}
-  gem.description = %Q{TODO: longer description of your gem}
+  gem.summary = "Deamonize your script with a single line of code"
+  gem.description = "Make calling script to become a daemon with pid file locking support and stdout/stderr redirection"
   gem.email = "jpastuszek@gmail.com"
   gem.authors = ["Jakub Pastuszek"]
   # dependencies defined in Gemfile

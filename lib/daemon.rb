@@ -1,4 +1,10 @@
 class Daemon
+	class LockError < RuntimeError
+		def initialize(pid_file)
+			super("cannot lock pid file '#{pid_file.path}', process already running with pid: #{pid_file.read.strip}")
+		end
+	end
+
 	def self.daemonize(pid_file, log_file = nil)
 		exit if fork
 		Process.setsid # become session leader
@@ -21,12 +27,13 @@ class Daemon
 	end
 
 	def self.lock(pid_file)
-		@pf = File.open(pid_file, File::RDWR | File::CREAT)
-		fail "already running with pid: #{@pf.read.strip}" unless @pf.flock(File::LOCK_EX|File::LOCK_NB)
-		@pf.truncate(0)
-		@pf.write(Process.pid.to_s + "\n")
-		@pf.flush
-		# keep it open and locked
+		pf = File.open(pid_file, File::RDWR | File::CREAT)
+		raise LockError, pf unless pf.flock(File::LOCK_EX|File::LOCK_NB)
+		pf.truncate(0)
+		pf.write(Process.pid.to_s + "\n")
+		pf.flush
+
+		@pf = pf # keep it open and locked until process exits
 	end
 end
 

@@ -5,7 +5,7 @@ class Daemon
 		end
 	end
 
-	def self.daemonize(pid_file, log_file = nil)
+	def self.daemonize(pid_file, log_file = nil, sync = true)
 		exit if fork
 		Process.setsid # become session leader
 		exit if fork # and exits
@@ -16,6 +16,7 @@ class Daemon
 
 		if log_file
 			log = File.open(log_file, 'a')
+			log.sync = sync
 		else
 			log = '/dev/null'
 		end

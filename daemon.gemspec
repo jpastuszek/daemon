@@ -5,11 +5,11 @@
 
 Gem::Specification.new do |s|
   s.name = "daemon"
-  s.version = "1.0.0"
+  s.version = "1.1.0"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Jakub Pastuszek"]
-  s.date = "2011-09-26"
+  s.date = "2011-09-28"
   s.description = "Make calling script to become a daemon with pid file locking support and stdout/stderr redirection"
   s.email = "jpastuszek@gmail.com"
   s.extra_rdoc_files = [

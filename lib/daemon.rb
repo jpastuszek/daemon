@@ -25,6 +25,9 @@ class Daemon
 		STDIN.reopen '/dev/null'
 		STDOUT.reopen log
 		STDERR.reopen log
+
+		STDOUT.sync = sync
+		STDERR.sync = sync
 	end
 
 	def self.lock(pid_file)

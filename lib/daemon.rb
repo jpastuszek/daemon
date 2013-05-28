@@ -6,16 +6,16 @@ class Daemon
 	end
 
 	def self.daemonize(pid_file, log_file = nil, sync = true)
-		exit if fork
+		exit! if fork
 		Process.setsid # become session leader
-		exit if fork # and exits
+		exit! if fork # and exits
 		# now in child
 
 		# try to lock before we kill stdin/out
 		lock(pid_file)
 
 		if log_file
-			log = File.open(log_file, 'a')
+			log = File.open(log_file, 'ab')
 			log.sync = sync
 		else
 			log = '/dev/null'

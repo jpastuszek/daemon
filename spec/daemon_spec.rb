@@ -5,11 +5,11 @@ require 'tempfile'
 
 describe Daemon do
 	let :pid_file do
-		'test.pid'
+		Tempfile.new('daemon-pid')
 	end
 
-	after :each do
-		File.unlink(pid_file) if File.exist?(pid_file)
+	let :log_file do
+		Tempfile.new('daemon-log')
 	end
 
 	describe 'locking' do
@@ -71,7 +71,7 @@ describe Daemon do
 				# now in protected child
 				loop{cr.readline and mw.puts 'pong'}
 			end
-			Process.wait # parent exits
+			Process.wait(pid) # parent exits
 
 			# close our end
 			mw.close
@@ -155,7 +155,7 @@ describe Daemon do
 		it '#disconnect should close STDIN and redirect STDIN and STDERR to given log file' do
 			tmp = Tempfile.new('daemon-test')
 
-			fork do
+			pid = fork do
 				Daemon.disconnect(tmp.path)
 
 				puts 'hello world'
@@ -165,7 +165,7 @@ describe Daemon do
 					puts 'foo bar'
 				end
 			end
-			Process.wait
+			Process.wait(pid)
 
 			tmp.readlines.map(&:strip).should == ['hello world', 'foo bar']
 		end
@@ -173,30 +173,27 @@ describe Daemon do
 		it '#disconnect should provide log file IO' do
 			tmp = Tempfile.new('daemon-test')
 
-			fork do
+			pid = fork do
 				log = Daemon.disconnect(tmp.path)
 				log.puts 'hello world'
 				puts 'foo bar'
 			end
-			Process.wait
+			Process.wait(pid)
 
 			tmp.readlines.map(&:strip).should == ['hello world', 'foo bar']
 		end
 
 		it '#disconnect should provide /dev/null file IO when no log file specified' do
-			fork do
+			pid = fork do
 				log = Daemon.disconnect
 				log.puts 'foo bar'
 				log.path.should == '/dev/null'
 			end
-			Process.wait2.last.should be_success
+			Process.wait2(pid).last.should be_success
 		end
 	end
 
 	it '#daemonize with block should fork new process with pid file and log file and call block with log IO' do
-		pid_file = Tempfile.new('daemon-pid')
-		log_file = Tempfile.new('daemon-log')
-
 		pid, wait = Daemon.daemonize(pid_file, log_file) do |log|
 			log.puts 'hello world'
 			puts 'foo bar'

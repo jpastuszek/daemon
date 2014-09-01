@@ -16,7 +16,7 @@ describe Daemon do
 		}.should raise_error Daemon::LockError
 	end
 
-	it 'should not call at_exit handler during deamonization' do
+	it 'should not call at_exit handler during daemonization' do
 		pid = Process.pid
 		at_exit do
 			fail 'at_exit called' if pid != Process.pid

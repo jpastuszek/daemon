@@ -154,7 +154,7 @@ describe Daemon do
 	describe 'IO handling' do
 		it '#disconnect should close STDIN and redirect STDIN and STDERR to given log file' do
 			pid = fork do
-				Daemon.disconnect(log_file.path)
+				Daemon.disconnect(log_file)
 
 				puts 'hello world'
 				begin
@@ -170,7 +170,7 @@ describe Daemon do
 
 		it '#disconnect should provide log file IO' do
 			pid = fork do
-				log = Daemon.disconnect(log_file.path)
+				log = Daemon.disconnect(log_file)
 				log.puts 'hello world'
 				puts 'foo bar'
 			end
@@ -187,6 +187,22 @@ describe Daemon do
 			end
 
 			Process.wait2(pid).last.should be_success
+		end
+
+		it '#disconnect should append log file' do
+			pid = fork do
+				Daemon.disconnect(log_file)
+				puts 'hello world'
+			end
+			Process.wait(pid)
+
+			pid = fork do
+				Daemon.disconnect(log_file)
+				puts 'foo bar'
+			end
+
+			Process.wait(pid)
+			log_file.readlines.map(&:strip).should == ['hello world', 'foo bar']
 		end
 	end
 

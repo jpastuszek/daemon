@@ -95,11 +95,11 @@ class Daemon
 
 	def self.disconnect(log_file = nil, sync = true)
 		if log_file
-			log = File.open(log_file, 'ab') # TODO: use flags as above
+			log = File.open(log_file, File::WRONLY | File::CREAT | File::APPEND | File::BINARY)
 			log.sync = sync
 		else
 			# don't raise on STDOUT/STDERR write
-			log = File.new('/dev/null', 'w')
+			log = File.new('/dev/null', File::WRONLY | File::BINARY)
 		end
 
 		# disconnect

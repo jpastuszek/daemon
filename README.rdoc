@@ -24,8 +24,16 @@ So full usage may look like this:
    Daemon.daemonize('myscript.pid', 'out.log')
  end
 
+To spawn a daemon process and keep runing:
+
+  pid, wait = Daemon.spawn('myscript.pid', 'out.log') do |log|
+    # daemon code
+  end
+
+  wait.value # wait for daemon to finish; returns Process::Status
+
 == Contributing to daemon
- 
+
 * Check out the latest master to make sure the feature hasn't been implemented or the bug hasn't been fixed yet
 * Check out the issue tracker to make sure someone already hasn't requested it and/or contributed it
 * Fork the project

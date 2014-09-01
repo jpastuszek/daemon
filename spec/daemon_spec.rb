@@ -1,6 +1,7 @@
 require File.expand_path(File.dirname(__FILE__) + '/spec_helper')
 require 'daemon'
 require 'timeout'
+require 'tempfile'
 
 $pf = 'test.pid'
 
@@ -76,6 +77,71 @@ describe Daemon do
 			cw.puts 'ping'
 			mr.readline.strip.should == 'pong'
 		end
+	end
+
+	it '#disconnect should close STDIN and redirect STDIN and STDERR to given log file' do
+		tmp = Tempfile.new('daemon-test')
+
+		fork do
+			Daemon.disconnect(tmp.path)
+
+			puts 'hello world'
+			begin
+				STDIN.read # should raise
+			rescue IOError
+				puts 'foo bar'
+			end
+		end
+		Process.wait
+
+		tmp.readlines.map(&:strip).should == ['hello world', 'foo bar']
+	end
+
+	it '#disconnect should provide log file IO' do
+		tmp = Tempfile.new('daemon-test')
+
+		fork do
+			log = Daemon.disconnect(tmp.path)
+			log.puts 'hello world'
+			puts 'foo bar'
+		end
+		Process.wait
+
+		tmp.readlines.map(&:strip).should == ['hello world', 'foo bar']
+	end
+
+	it '#spawn should fork new process with pid file and log file and call block with log IO' do
+		pid_file = Tempfile.new('daemon-pid')
+		log_file = Tempfile.new('daemon-log')
+
+		pid, wait = Daemon.spawn(pid_file, log_file) do |log|
+			log.puts 'hello world'
+			puts 'foo bar'
+		end
+
+		# wait for process to finish
+		wait.join
+
+		log_file.readlines.map(&:strip).should == ['hello world', 'foo bar']
+	end
+
+	it '#spawn should raise error when lock file is busy' do
+		pid_file = Tempfile.new('daemon-pid')
+		log_file = Tempfile.new('daemon-log')
+
+		pid, wait = Daemon.spawn(pid_file, log_file) do |log|
+			log.puts 'hello world'
+			puts 'foo bar'
+			sleep 1
+		end
+
+		expect {
+			Daemon.spawn(pid_file, log_file){|log|}
+		}.to raise_error Daemon::LockError
+
+		Process.kill('TERM', pid)
+
+		log_file.readlines.map(&:strip).should == ['hello world', 'foo bar']
 	end
 
 	it 'should not call at_exit handler during daemonization' do

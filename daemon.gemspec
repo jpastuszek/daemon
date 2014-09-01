@@ -5,11 +5,11 @@
 
 Gem::Specification.new do |s|
   s.name = "daemon"
-  s.version = "1.1.0"
+  s.version = "1.2.0"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Jakub Pastuszek"]
-  s.date = "2011-09-28"
+  s.date = "2014-09-01"
   s.description = "Make calling script to become a daemon with pid file locking support and stdout/stderr redirection"
   s.email = "jpastuszek@gmail.com"
   s.extra_rdoc_files = [
@@ -32,31 +32,25 @@ Gem::Specification.new do |s|
   s.homepage = "http://github.com/jpastuszek/daemon"
   s.licenses = ["MIT"]
   s.require_paths = ["lib"]
-  s.rubygems_version = "1.8.10"
+  s.rubygems_version = "1.8.23"
   s.summary = "Daemonize your script with a single line of code"
 
   if s.respond_to? :specification_version then
     s.specification_version = 3
 
     if Gem::Version.new(Gem::VERSION) >= Gem::Version.new('1.2.0') then
-      s.add_development_dependency(%q<rspec>, ["~> 2.3.0"])
-      s.add_development_dependency(%q<shoulda>, [">= 0"])
-      s.add_development_dependency(%q<bundler>, ["~> 1.0.0"])
-      s.add_development_dependency(%q<jeweler>, ["~> 1.6.4"])
-      s.add_development_dependency(%q<rcov>, [">= 0"])
+      s.add_development_dependency(%q<rspec>, ["~> 2.13"])
+      s.add_development_dependency(%q<jeweler>, ["~> 1.8.4"])
+      s.add_development_dependency(%q<rdoc>, ["~> 3.9"])
     else
-      s.add_dependency(%q<rspec>, ["~> 2.3.0"])
-      s.add_dependency(%q<shoulda>, [">= 0"])
-      s.add_dependency(%q<bundler>, ["~> 1.0.0"])
-      s.add_dependency(%q<jeweler>, ["~> 1.6.4"])
-      s.add_dependency(%q<rcov>, [">= 0"])
+      s.add_dependency(%q<rspec>, ["~> 2.13"])
+      s.add_dependency(%q<jeweler>, ["~> 1.8.4"])
+      s.add_dependency(%q<rdoc>, ["~> 3.9"])
     end
   else
-    s.add_dependency(%q<rspec>, ["~> 2.3.0"])
-    s.add_dependency(%q<shoulda>, [">= 0"])
-    s.add_dependency(%q<bundler>, ["~> 1.0.0"])
-    s.add_dependency(%q<jeweler>, ["~> 1.6.4"])
-    s.add_dependency(%q<rcov>, [">= 0"])
+    s.add_dependency(%q<rspec>, ["~> 2.13"])
+    s.add_dependency(%q<jeweler>, ["~> 1.8.4"])
+    s.add_dependency(%q<rdoc>, ["~> 3.9"])
   end
 end
 

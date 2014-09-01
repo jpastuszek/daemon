@@ -4,11 +4,11 @@ require 'timeout'
 require 'tempfile'
 
 describe Daemon do
-	let :pid_file do
+	let! :pid_file do
 		Tempfile.new('daemon-pid')
 	end
 
-	let :log_file do
+	let! :log_file do
 		Tempfile.new('daemon-log')
 	end
 
@@ -153,10 +153,8 @@ describe Daemon do
 
 	describe 'IO handling' do
 		it '#disconnect should close STDIN and redirect STDIN and STDERR to given log file' do
-			tmp = Tempfile.new('daemon-test')
-
 			pid = fork do
-				Daemon.disconnect(tmp.path)
+				Daemon.disconnect(log_file.path)
 
 				puts 'hello world'
 				begin
@@ -167,20 +165,18 @@ describe Daemon do
 			end
 			Process.wait(pid)
 
-			tmp.readlines.map(&:strip).should == ['hello world', 'foo bar']
+			log_file.readlines.map(&:strip).should == ['hello world', 'foo bar']
 		end
 
 		it '#disconnect should provide log file IO' do
-			tmp = Tempfile.new('daemon-test')
-
 			pid = fork do
-				log = Daemon.disconnect(tmp.path)
+				log = Daemon.disconnect(log_file.path)
 				log.puts 'hello world'
 				puts 'foo bar'
 			end
 			Process.wait(pid)
 
-			tmp.readlines.map(&:strip).should == ['hello world', 'foo bar']
+			log_file.readlines.map(&:strip).should == ['hello world', 'foo bar']
 		end
 
 		it '#disconnect should provide /dev/null file IO when no log file specified' do
@@ -189,7 +185,36 @@ describe Daemon do
 				log.puts 'foo bar'
 				log.path.should == '/dev/null'
 			end
+
 			Process.wait2(pid).last.should be_success
+		end
+	end
+
+	it '#deamonize should terminate current process while keeping the script running' do
+		log_file.open do |log|
+
+			pid = fork do
+				puts master_pid = Process.pid
+				Daemon.daemonize(pid_file, log_file, true)
+				Process.pid.should_not == master_pid
+				puts 'hello world'
+			end
+
+			Process.wait2(pid).last.should be_success # wait for master to go away (successfully)
+
+			log.readline.map(&:strip).should == ['hello world']
+		end
+	end
+
+	it '#deamonize should return log file IO' do
+		log_file.open do |log|
+			pid = fork do
+				log = Daemon.daemonize(pid_file, log_file, true)
+				log.puts 'hello world'
+			end
+			Process.wait2(pid).last.should be_success # wait for master to go away
+
+			log.readline.map(&:strip).should == ['hello world']
 		end
 	end
 
@@ -206,9 +231,6 @@ describe Daemon do
 	end
 
 	it '#daemonize with block should raise error when lock file is busy' do
-		pid_file = Tempfile.new('daemon-pid')
-		log_file = Tempfile.new('daemon-log')
-
 		pid, wait = Daemon.daemonize(pid_file, log_file) do |log|
 			log.puts 'hello world'
 			puts 'foo bar'

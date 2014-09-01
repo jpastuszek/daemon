@@ -48,7 +48,7 @@ class Daemon
 				->(error){
 					w.write Marshal.dump(error) # send error to parent
 					w.close
-					exit
+					exit 42
 				}
 			)
 		end
@@ -77,7 +77,7 @@ class Daemon
 				yield
 			end # => pid
 		else
-			exit! if fork
+			exit! 0 if fork
 			Process.setsid # become new session leader
 			# now in child
 		end
@@ -95,7 +95,7 @@ class Daemon
 
 	def self.disconnect(log_file = nil, sync = true)
 		if log_file
-			log = File.open(log_file, 'ab')
+			log = File.open(log_file, 'ab') # TODO: use flags as above
 			log.sync = sync
 		else
 			# don't raise on STDOUT/STDERR write

@@ -6,54 +6,81 @@ class Daemon
 	end
 
 	def self.daemonize(pid_file, log_file = nil, sync = true)
-		# become new process group leader
-		fence
+		if block_given?
+			spawn do |send_ok, send_error|
+				log = begin
+					# try to lock before we kill stdin/out
+					lock(pid_file)
 
-		# try to lock before we kill stdin/out
-		lock(pid_file)
+					# close I/O
+					disconnect(log_file, sync)
+				rescue => error
+					send_error.call(error)
+				end
 
-		# close I/O
-		disconnect(log_file, sync)
-	end
+				send_ok.call
 
-	def self.spawn(pid_file, log_file = nil, sync = true)
-		r, w = IO.pipe
-
-		pid = fork do
-			Process.setsid # become new session leader
-			r.close
-			log = nil
+				yield log
+			end # => pid, wait
+		else
+			# become new process group leader
+			fence
 
 			# try to lock before we kill stdin/out
-			begin
-				lock(pid_file)
+			lock(pid_file)
 
-				# close I/O
-				log = disconnect(log_file, sync)
-
-				w.write Marshal.dump(nil) # send OK to parent
-				w.close
-			rescue => error
-				w.write Marshal.dump(error) # send error to parent
-				w.close
-				exit!
-			end
-
-			yield log
+			# close I/O
+			disconnect(log_file, sync) # => log
 		end
+	end
+
+	def self.spawn
+		r, w = IO.pipe
+
+		pid = fence do
+			r.close
+
+			yield(
+				->{
+					w.write Marshal.dump(nil) # send OK to parent
+					w.close
+				},
+				->(error){
+					w.write Marshal.dump(error) # send error to parent
+					w.close
+					exit
+				}
+			)
+		end
+		thr = Process.detach(pid)
 
 		w.close
-		error = Marshal.load(r.read) and raise error
+		data = r.read
+		data.empty? and fail 'ok/error handler not called!'
 
-		return pid, Process.detach(pid)
+		if error = Marshal.load(data)
+			thr.join # wait for child to die
+			raise error
+		end
+
+		return pid, thr
 	ensure
+		w.close unless w.closed?
 		r.close
 	end
 
 	def self.fence
-		exit! if fork
-		Process.setsid # become new session leader
-		# now in child
+		if block_given?
+			fork do
+				Process.setsid # become new session leader
+				# now in child
+				yield
+			end # => pid
+		else
+			exit! if fork
+			Process.setsid # become new session leader
+			# now in child
+		end
 	end
 
 	def self.lock(pid_file)
@@ -72,7 +99,7 @@ class Daemon
 			log.sync = sync
 		else
 			# don't raise on STDOUT/STDERR write
-			log = '/dev/null'
+			log = File.new('/dev/null', 'w')
 		end
 
 		# disconnect
@@ -84,4 +111,3 @@ class Daemon
 		return log
 	end
 end
-

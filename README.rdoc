@@ -24,9 +24,9 @@ So full usage may look like this:
    Daemon.daemonize('myscript.pid', 'out.log')
  end
 
-To spawn a daemon process and keep runing:
+To spawn a daemon process and keep current process runing:
 
-  pid, wait = Daemon.spawn('myscript.pid', 'out.log') do |log|
+  pid, wait = Daemon.daemonize('myscript.pid', 'out.log') do |log|
     # daemon code
   end
 

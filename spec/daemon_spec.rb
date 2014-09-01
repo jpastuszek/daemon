@@ -3,118 +3,201 @@ require 'daemon'
 require 'timeout'
 require 'tempfile'
 
-$pf = 'test.pid'
-
 describe Daemon do
-	it '#lock should create a pid file with current process pid' do
-		Daemon.lock($pf)
-		File.open($pf).read.should == "#{Process.pid}\n"
+	let :pid_file do
+		'test.pid'
 	end
 
-	it '#lock should raise error if called twice on same pid file' do
-		Daemon.lock($pf)
-		lambda {
-			Daemon.lock($pf)
-		}.should raise_error Daemon::LockError
+	after :each do
+		File.unlink(pid_file) if File.exist?(pid_file)
 	end
 
-	it '#fence should start new process group to protect the process from HUP signal' do
-		cr, cw = *IO.pipe
-		mr, mw = *IO.pipe
-
-		pid = fork do # parent
-			Process.setsid # start new process group
-			pid = fork do # child
-				loop{cr.readline and mw.puts 'pong'}
-			end
-			Process.wait(pid)
+	describe 'locking' do
+		it '#lock should create a pid file with current process pid' do
+			Daemon.lock(pid_file)
+			File.open(pid_file).read.should == "#{Process.pid}\n"
 		end
 
-		# close our end
-		mw.close
-		cr.close
-
-		# wait for the child to start
-		cw.puts 'ping'
-		mr.readline.strip.should == 'pong'
-
-		Process.kill('HUP', -pid) # kill the group; this should kill the child
-		Process.wait(pid) # parent exit
-
-		expect {
-			Timeout.timeout(2) do
-					# child is dead
-					cw.puts 'ping'
-			end
-		}.to raise_error Errno::EPIPE
-
-		#### Now with the #fence used
-		cr, cw = *IO.pipe
-		mr, mw = *IO.pipe
-
-		pid = fork do # parent
-			Process.setsid # start new process group
-
-			Daemon.fence
-			loop{cr.readline and mw.puts 'pong'}
+		it '#lock should raise error if called twice on same pid file' do
+			Daemon.lock(pid_file)
+			lambda {
+				Daemon.lock(pid_file)
+			}.should raise_error Daemon::LockError
 		end
-		Process.wait # parent exits
+	end
 
-		# close our end
-		mw.close
-		cr.close
+	describe 'forking' do
+		it 'forked sub process can be terminated with SIGHUP to whole process group' do
+			cr, cw = *IO.pipe
+			mr, mw = *IO.pipe
 
-		# wait for the child to start
-		cw.puts 'ping'
-		mr.readline.strip.should == 'pong'
+			pid = fork do # parent
+				Process.setsid # start new process group
 
-		expect {
-			Process.kill('HUP', -pid)
-			# the group is gone with the parent process
-		}.to raise_error Errno::ESRCH
+				pid = fork do # child
+					loop{cr.readline and mw.puts 'pong'}
+				end
+				Process.wait(pid)
+			end
 
-		Timeout.timeout(2) do
+			# close our end
+			mw.close
+			cr.close
+
+			# wait for the child to start
 			cw.puts 'ping'
 			mr.readline.strip.should == 'pong'
+
+			Process.kill('HUP', -pid) # kill the group; this should kill the child
+			Process.wait(pid) # parent exit
+
+			expect {
+				Timeout.timeout(2) do
+					# child is dead
+					cw.puts 'ping'
+				end
+			}.to raise_error Errno::EPIPE
 		end
-	end
 
-	it '#disconnect should close STDIN and redirect STDIN and STDERR to given log file' do
-		tmp = Tempfile.new('daemon-test')
+		it '#fence should start new process group to protect the process from HUP signal' do
+			cr, cw = *IO.pipe
+			mr, mw = *IO.pipe
 
-		fork do
-			Daemon.disconnect(tmp.path)
+			pid = fork do # parent
+				Process.setsid # start new process group
 
-			puts 'hello world'
-			begin
-				STDIN.read # should raise
-			rescue IOError
-				puts 'foo bar'
+				Daemon.fence
+
+				# now in protected child
+				loop{cr.readline and mw.puts 'pong'}
+			end
+			Process.wait # parent exits
+
+			# close our end
+			mw.close
+			cr.close
+
+			# wait for the child to start
+			cw.puts 'ping'
+			mr.readline.strip.should == 'pong'
+
+			expect {
+				Process.kill('HUP', -pid)
+				# the group is gone with the parent process
+			}.to raise_error Errno::ESRCH
+
+			Timeout.timeout(2) do
+				# child still there
+				cw.puts 'ping'
+				mr.readline.strip.should == 'pong'
 			end
 		end
-		Process.wait
 
-		tmp.readlines.map(&:strip).should == ['hello world', 'foo bar']
-	end
+		it '#fence with block should start new process group to protect the process from HUP signal calling provided block within it' do
+			cr, cw = *IO.pipe
+			mr, mw = *IO.pipe
 
-	it '#disconnect should provide log file IO' do
-		tmp = Tempfile.new('daemon-test')
+			pid = fork do # parent
+				Process.setsid # start new process group
 
-		fork do
-			log = Daemon.disconnect(tmp.path)
-			log.puts 'hello world'
-			puts 'foo bar'
+				pid = Daemon.fence do
+					# now in protected child
+					loop{cr.readline and mw.puts 'pong'}
+				end
+
+				Process.wait(pid)
+			end
+
+			# close our end
+			mw.close
+			cr.close
+
+			# wait for the child to start
+			cw.puts 'ping'
+			mr.readline.strip.should == 'pong'
+
+			Process.kill('HUP', -pid) # kill the group; this would kill the child
+			Process.wait(pid) # parent exit
+
+			Timeout.timeout(2) do
+				# child still there
+				cw.puts 'ping'
+				mr.readline.strip.should == 'pong'
+			end
 		end
-		Process.wait
 
-		tmp.readlines.map(&:strip).should == ['hello world', 'foo bar']
+		it '#spawn should call block in fenced child process and return child pid and wait thread' do
+			pid, wait = Daemon.spawn do |send_ok, send_error|
+				send_ok.call
+				sleep 0.2
+			end
+
+			pid.should > 0
+			wait.should be_alive
+
+			wait.value.should be_success
+		end
+
+		it '#spawn should call block in fenced child process raising reported errors in master' do
+			expect {
+				Daemon.spawn do |send_ok, send_error|
+					begin
+						fail 'test'
+					rescue => error
+						send_error.call error
+					end
+				end
+			}.to raise_error RuntimeError, 'test'
+		end
 	end
 
-	it '#spawn should fork new process with pid file and log file and call block with log IO' do
+	describe 'IO handling' do
+		it '#disconnect should close STDIN and redirect STDIN and STDERR to given log file' do
+			tmp = Tempfile.new('daemon-test')
+
+			fork do
+				Daemon.disconnect(tmp.path)
+
+				puts 'hello world'
+				begin
+					STDIN.read # should raise
+				rescue IOError
+					puts 'foo bar'
+				end
+			end
+			Process.wait
+
+			tmp.readlines.map(&:strip).should == ['hello world', 'foo bar']
+		end
+
+		it '#disconnect should provide log file IO' do
+			tmp = Tempfile.new('daemon-test')
+
+			fork do
+				log = Daemon.disconnect(tmp.path)
+				log.puts 'hello world'
+				puts 'foo bar'
+			end
+			Process.wait
+
+			tmp.readlines.map(&:strip).should == ['hello world', 'foo bar']
+		end
+
+		it '#disconnect should provide /dev/null file IO when no log file specified' do
+			fork do
+				log = Daemon.disconnect
+				log.puts 'foo bar'
+				log.path.should == '/dev/null'
+			end
+			Process.wait2.last.should be_success
+		end
+	end
+
+	it '#daemonize with block should fork new process with pid file and log file and call block with log IO' do
 		pid_file = Tempfile.new('daemon-pid')
 		log_file = Tempfile.new('daemon-log')
 
-		pid, wait = Daemon.spawn(pid_file, log_file) do |log|
+		pid, wait = Daemon.daemonize(pid_file, log_file) do |log|
 			log.puts 'hello world'
 			puts 'foo bar'
 		end
@@ -125,40 +208,40 @@ describe Daemon do
 		log_file.readlines.map(&:strip).should == ['hello world', 'foo bar']
 	end
 
-	it '#spawn should raise error when lock file is busy' do
+	it '#daemonize with block should raise error when lock file is busy' do
 		pid_file = Tempfile.new('daemon-pid')
 		log_file = Tempfile.new('daemon-log')
 
-		pid, wait = Daemon.spawn(pid_file, log_file) do |log|
+		pid, wait = Daemon.daemonize(pid_file, log_file) do |log|
 			log.puts 'hello world'
 			puts 'foo bar'
 			sleep 1
 		end
 
 		expect {
-			Daemon.spawn(pid_file, log_file){|log|}
+			Daemon.daemonize(pid_file, log_file){|log|}
 		}.to raise_error Daemon::LockError
 
 		Process.kill('TERM', pid)
+		wait.join
 
 		log_file.readlines.map(&:strip).should == ['hello world', 'foo bar']
 	end
 
-	it 'should not call at_exit handler during daemonization' do
-		pid = Process.pid
-		at_exit do
-			fail 'at_exit called' if pid != Process.pid
-		end
+	it '#daemnize should not call at_exit handler' do
+		pid = fork do
+			pid = Process.pid
+			at_exit do
+				fail 'at_exit called' if pid != Process.pid
+			end
 
-		fork do
-			Daemon.daemonize($pf, '/dev/stdout')
-			exit! # dont call at_exit
+			fork do
+				Daemon.daemonize(pid_file, '/dev/stdout')
+				exit! # dont call at_exit
+			end
+			Process.wait
 		end
-		Process.wait
-	end
-
-	after :each do
-		File.unlink($pf) if File.exist?($pf)
+		Process.wait2(pid).last.should be_success
 	end
 end
 
